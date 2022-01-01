@@ -18,11 +18,6 @@ type
     ES384
     ES512
 
-  JOSEHeader* = object
-    alg*: SignatureAlgorithm
-    typ*: string
-
-
 proc strToSignatureAlgorithm(s: string): SignatureAlgorithm =
   try:
     result = parseEnum[SignatureAlgorithm](s)
@@ -30,31 +25,25 @@ proc strToSignatureAlgorithm(s: string): SignatureAlgorithm =
     raise newException(UnsupportedAlgorithm, "$# isn't supported" % s)
 
 
-proc toHeader*(j: JsonNode): JOSEHeader =
+proc toHeader*(j: JsonNode): JsonNode =
   # Check that the keys are present so we dont blow up.
+  result = newJObject()
   utils.checkKeysExists(j, "alg", "typ")
+  # we do this attribute by attribute because some tests depend on the order of these keys
+  result["alg"] = %strToSignatureAlgorithm(j["alg"].getStr())
+  result["typ"] = j["typ"]
+  for key in j.keys:
+    if not result.hasKey(key):
+      result[key] = j[key]
 
-  let algStr = j["alg"].getStr()
-  let algo = strToSignatureAlgorithm(algStr)
-
-  result = JOSEHeader(
-    alg: algo,
-    typ: j["typ"].getStr()
-  )
-
+proc alg*(j: JsonNode): SignatureAlgorithm =
+  doAssert j.hasKey("alg")
+  return j["alg"].getStr().strToSignatureAlgorithm()
 
 proc `%`*(alg: SignatureAlgorithm): JsonNode =
   let s = $alg
   return %s
 
 
-proc `%`*(h: JOSEHeader): JsonNode =
-  return %{
-    "alg": %h.alg,
-    "typ": %h.typ
-  }
-
-
-proc toBase64*(h: JOSEHeader): string =
-  let asJson = %h
-  result = encodeUrlSafe($asJson)
+proc toBase64*(h: JsonNode): string =
+  result = encodeUrlSafe($h)

@@ -163,3 +163,19 @@ suite "Token tests":
 
       # eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiSm9obiBEb2UiLCJzdWIiOiIxMjM0NTY3ODkwIiwiaWF0IjoxNTE2MjM5MDIyfQ.gDQjM0w-foh2h54D2eNV5JzKa2Y5lwoU168jlj2IImH8DDhGHFrjfjstmXos8zGv9iHFzLp5HPYjOZDV_BqX7Q"
       # $signedECToken("ES256") was eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiSm9obiBEb2UiLCJzdWIiOiIxMjM0NTY3ODkwIiwiaWF0IjoxNTE2MjM5MDIyfQ.Z70NdbsTiPV5PpE2foY9YSehQCm20naEKPLdCZy_dV2W6uPLJTOY6JvAA9r9gykdxuH6dbTZUPo2yxRjpxJrJg
+
+  test "header values":
+    var token = toJWT(%*{
+      "header": {
+        "alg": "HS256",
+        "kid": "something",
+        "typ": "JWT"
+      },
+      "claims": {
+        "userId": 1
+      }
+    })
+    token.sign(rsPrivateKey)
+    let signed = $token
+    let decoded = signed.toJWT()
+    check decoded.header["kid"].getStr() == "something"

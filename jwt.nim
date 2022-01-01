@@ -11,7 +11,7 @@ type
   JWT* = object
     headerB64: string
     claimsB64: string
-    header*: JOSEHeader
+    header*: JsonNode
     claims*: TableRef[string, Claim]
     signature*: seq[byte]
 
@@ -24,7 +24,7 @@ proc splitToken(s: string): seq[string] =
     raise newException(InvalidToken, "Invalid token")
   result = parts
 
-proc initJWT*(header: JOSEHeader, claims: TableRef[string, Claim], signature: seq[byte] = @[]): JWT =
+proc initJWT*(header: JsonNode, claims: TableRef[string, Claim], signature: seq[byte] = @[]): JWT =
   JWT(
     headerB64: header.toBase64,
     claimsB64: claims.toBase64,
