@@ -90,7 +90,3 @@ proc request(url: string, body: string): string =
 let resp = request("https://www.googleapis.com/oauth2/v4/token", postdata).parseJson()
 echo "Access token is: ", resp["access_token"].str
 ```
-
-## Troubleshooting
-This library requires a recent version of libcrypto. Specifically the one that
-has `EVP_DigestSign*` functions.
