@@ -34,7 +34,7 @@ proc sign(userId: string): string =
     },
     "claims": {
       "userId": userId,
-      "exp": (getTime() + 1.days).toSeconds().int
+      "exp": (getTime() + 1.days).toUnix()
     }
   })
 
