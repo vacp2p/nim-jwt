@@ -96,7 +96,7 @@ proc bearVerifyRSPem*(data, key: string, sig: openarray[byte], alg: ptr HashClas
   var digest2: array[64, byte]
 
   if s(cast[ptr char](unsafeAddr sig[0]), sig.len, cast[ptr char](hashOid), hashLen, addr pk, cast[ptr char](addr digest2[0])) != 1:
-    raise newException(Exception, "Could not verify")
+    return false
 
   digest == digest2
 
