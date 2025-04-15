@@ -17,7 +17,7 @@ This is a implementation of JSON Web Tokens for Nim, it allows for the following
 After installing nim's package manager `nimble` execute this:
 `nimble install jwt`
 
-## Example
+## Examples
 
 An example to demonstrate use with a userId
 
@@ -89,4 +89,52 @@ proc request(url: string, body: string): string =
 
 let resp = request("https://www.googleapis.com/oauth2/v4/token", postdata).parseJson()
 echo "Access token is: ", resp["access_token"].str
+```
+
+Registering in [Let's Encrypt's](https://letsencrypt.org/) [ACME](https://www.rfc-editor.org/rfc/rfc8555) server
+```nim
+let key = "your_rsa_key_here"
+let registerAccountPayload = %*{"termsOfServiceAgreed": true}
+let resp = makeSignedAcmeRequest(getDirectory()["newAccount"].getStr, registerAccountPayload, key, needsJwk = true)
+echo resp.body
+
+proc makeSignedAcmeRequest(
+    url: string, payload: JsonNode, accountKey: string, needsJwk: bool = false
+): Response =
+  let key = loadRsaKey(accountKey)
+  var token = toJWT(
+    %*{
+      "header":
+        getAcmeHeader(url, needsJwk, base64UrlEncode(key.n), base64UrlEncode(key.e)),
+      "claims": payload,
+    }
+  )
+  token.sign(accountKey)
+
+  var client = newHttpClient()
+  let body = token.toFlattennedJson
+  echo body
+  client.request(url, httpMethod = HttpPost, body = $body, headers = newHttpHeaders({"Content-Type": "application/jose+json"}))
+
+proc getAcmeHeader(
+    url: string, needsJwk: bool, n: string = "", e: string = ""
+): JsonNode =
+  var header = %*{"alg": Alg, "typ": "JWT", "nonce": getNewNonce(), "url": url}
+  if needsJwk:
+    header["jwk"] = %*{"kty": "RSA", "n": n, "e": e}
+  else:
+    header["kid"] = "some_kid"
+  return header
+
+proc getNewNonce(): string =
+  let client = newHttpClient()
+  let nonceURL = getDirectory()["newNonce"].getStr
+  let resp = client.request(nonceURL, httpMethod = HttpGet)
+  return resp.headers["replay-nonce"]
+
+proc getDirectory(): JsonNode =
+  let client = newHttpClient()
+  let directory = parseJson(client.get(LetsEncryptURL & "/directory").body)
+  return directory
+
 ```
