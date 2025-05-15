@@ -1,9 +1,6 @@
 import json, strutils, tables, times
 import bearssl
-
-from jwt/private/crypto import nil
-
-import jwt/private/[claims, jose, utils]
+import jwt/[claims, jose, utils, crypto]
 
 type
   InvalidToken* = object of ValueError

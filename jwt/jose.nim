@@ -1,5 +1,4 @@
 import json, strutils
-
 import utils
 
 type
@@ -23,7 +22,6 @@ proc strToSignatureAlgorithm(s: string): SignatureAlgorithm =
   except ValueError:
     raise newException(UnsupportedAlgorithm, "$# isn't supported" % s)
 
-
 proc toHeader*(j: JsonNode): JsonNode =
   # Check that the keys are present so we dont blow up.
   result = newJObject()
@@ -42,7 +40,6 @@ proc alg*(j: JsonNode): SignatureAlgorithm =
 proc `%`*(alg: SignatureAlgorithm): JsonNode =
   let s = $alg
   return %s
-
 
 proc toBase64*(h: JsonNode): string =
   result = encodeUrlSafe($h)

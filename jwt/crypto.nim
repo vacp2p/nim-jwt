@@ -3,7 +3,7 @@ import bearssl, bearssl_pkey_decoder
 # This pragma should be the same as in nim-bearssl/decls.nim
 {.pragma: bearSslFunc, cdecl, gcsafe, noSideEffect, raises: [].}
 
-proc bearHMAC*(digestVtable: ptr HashClass; key, d: string): seq[byte] =
+proc bearHMAC*(digestVtable: ptr HashClass, key, d: string): seq[byte] =
   var hKey: HmacKeyContext
   var hCtx: HmacContext
   hmacKeyInit(hKey, digestVtable, key.cstring, key.len.uint)
@@ -16,15 +16,18 @@ proc bearHMAC*(digestVtable: ptr HashClass; key, d: string): seq[byte] =
 proc invalidPemKey() =
   raise newException(ValueError, "Invalid PEM encoding")
 
-proc pemDecoderLoop(pem: string, prc: proc(ctx: pointer, pbytes: pointer, nbytes: uint) {.bearSslFunc.}, ctx: pointer) =
+proc pemDecoderLoop(
+    pem: string,
+    prc: proc(ctx: pointer, pbytes: pointer, nbytes: uint) {.bearSslFunc.},
+    ctx: pointer,
+) =
   var pemCtx: PemDecoderContext
   pemDecoderInit(pemCtx)
   var length = len(pem)
   var offset = 0
   var inobj = false
   while length > 0:
-    var tlen = pemDecoderPush(pemCtx,
-                              unsafeAddr pem[offset], length.uint).int
+    var tlen = pemDecoderPush(pemCtx, unsafeAddr pem[offset], length.uint).int
     offset = offset + tlen
     length = length - tlen
 
@@ -44,13 +47,23 @@ proc pemDecoderLoop(pem: string, prc: proc(ctx: pointer, pbytes: pointer, nbytes
 
 proc decodeFromPem(skCtx: var SkeyDecoderContext, pem: string) =
   skeyDecoderInit(skCtx)
-  pemDecoderLoop(pem, cast[proc(ctx: pointer, pbytes: pointer, nbytes: uint) {.bearSslFunc.}](skeyDecoderPush), addr skCtx)
-  if skeyDecoderLastError(skCtx) != 0: invalidPemKey()
+  pemDecoderLoop(
+    pem,
+    cast[proc(ctx: pointer, pbytes: pointer, nbytes: uint) {.bearSslFunc.}](skeyDecoderPush),
+    addr skCtx,
+  )
+  if skeyDecoderLastError(skCtx) != 0:
+    invalidPemKey()
 
 proc decodeFromPem(pkCtx: var PkeyDecoderContext, pem: string) =
   pkeyDecoderInit(addr pkCtx)
-  pemDecoderLoop(pem, cast[proc(ctx: pointer, pbytes: pointer, nbytes: uint) {.bearSslFunc.}](pkeyDecoderPush), addr pkCtx)
-  if pkeyDecoderLastError(addr pkCtx) != 0: invalidPemKey()
+  pemDecoderLoop(
+    pem,
+    cast[proc(ctx: pointer, pbytes: pointer, nbytes: uint) {.bearSslFunc.}](pkeyDecoderPush),
+    addr pkCtx,
+  )
+  if pkeyDecoderLastError(addr pkCtx) != 0:
+    invalidPemKey()
 
 proc calcHash(alg: ptr HashClass, data: string, output: var array[64, byte]) =
   var ctx: array[512, byte]
@@ -61,14 +74,17 @@ proc calcHash(alg: ptr HashClass, data: string, output: var array[64, byte]) =
     alg.update(pCtx, unsafeAddr data[0], data.len.uint)
   alg.`out`(pCtx, addr output[0])
 
-proc bearSignRSPem*(data, key: string, alg: ptr HashClass, hashOid: cstring, hashLen: int): seq[byte] =
+proc bearSignRSPem*(
+    data, key: string, alg: ptr HashClass, hashOid: cstring, hashLen: int
+): seq[byte] =
   # Step 1. Extract RSA key from `key` in PEM format
   var skCtx: SkeyDecoderContext
   decodeFromPem(skCtx, key)
   if skeyDecoderKeyType(skCtx) != KEYTYPE_RSA:
     invalidPemKey()
 
-  template pk(): RsaPrivateKey = skCtx.key.rsa
+  template pk(): RsaPrivateKey =
+    skCtx.key.rsa
 
   # Step 2. Hash!
   var digest: array[64, byte]
@@ -78,16 +94,24 @@ proc bearSignRSPem*(data, key: string, alg: ptr HashClass, hashOid: cstring, has
   result = newSeqUninitialized[byte](sigLen)
   let s = rsaPkcs1SignGetDefault()
   assert(not s.isNil)
-  if s(cast[ptr byte](hashOid), addr digest[0], hashLen.uint, addr pk, addr result[0]) != 1:
+  if s(cast[ptr byte](hashOid), addr digest[0], hashLen.uint, addr pk, addr result[0]) !=
+      1:
     raise newException(ValueError, "Could not sign")
 
-proc bearVerifyRSPem*(data, key: string, sig: openarray[byte], alg: ptr HashClass, hashOid: cstring, hashLen: int): bool =
+proc bearVerifyRSPem*(
+    data, key: string,
+    sig: openarray[byte],
+    alg: ptr HashClass,
+    hashOid: cstring,
+    hashLen: int,
+): bool =
   # Step 1. Extract RSA key from `key` in PEM format
   var pkCtx: PkeyDecoderContext
   decodeFromPem(pkCtx, key)
   if pkeyDecoderKeyType(addr pkCtx) != KEYTYPE_RSA:
     invalidPemKey()
-  template pk(): RsaPublicKey = pkCtx.key.rsa
+  template pk(): RsaPublicKey =
+    pkCtx.key.rsa
 
   var digest: array[64, byte]
   calcHash(alg, data, digest)
@@ -95,7 +119,14 @@ proc bearVerifyRSPem*(data, key: string, sig: openarray[byte], alg: ptr HashClas
   let s = rsaPkcs1VrfyGetDefault()
   var digest2: array[64, byte]
 
-  if s(unsafeAddr sig[0], sig.len.uint, cast[ptr byte](hashOid), hashLen.uint, addr pk, addr digest2[0]) != 1:
+  if s(
+    unsafeAddr sig[0],
+    sig.len.uint,
+    cast[ptr byte](hashOid),
+    hashLen.uint,
+    addr pk,
+    addr digest2[0],
+  ) != 1:
     return false
 
   digest == digest2
@@ -107,7 +138,8 @@ proc bearSignECPem*(data, key: string, alg: ptr HashClass): seq[byte] =
   if skeyDecoderKeyType(skCtx) != KEYTYPE_EC:
     invalidPemKey()
 
-  template pk(): EcPrivateKey = skCtx.key.ec
+  template pk(): EcPrivateKey =
+    skCtx.key.ec
 
   # Step 2. Hash!
   var digest: array[64, byte]
@@ -123,13 +155,16 @@ proc bearSignECPem*(data, key: string, alg: ptr HashClass): seq[byte] =
   assert(sz <= maxSigLen)
   result.setLen(sz)
 
-proc bearVerifyECPem*(data, key: string, sig: openarray[byte], alg: ptr HashClass, hashLen: int): bool =
+proc bearVerifyECPem*(
+    data, key: string, sig: openarray[byte], alg: ptr HashClass, hashLen: int
+): bool =
   # Step 1. Extract EC Pub key from `key` in PEM format
   var pkCtx: PkeyDecoderContext
   decodeFromPem(pkCtx, key)
   if pkeyDecoderKeyType(addr pkCtx) != KEYTYPE_EC:
     invalidPemKey()
-  template pk(): EcPublicKey = pkCtx.key.ec
+  template pk(): EcPublicKey =
+    pkCtx.key.ec
 
   # bearssl ecdsaVrfy requires pubkey to be prepended with 0x04 byte, do it here
   assert((pk.q == addr pkCtx.key_data) and pk.qlen < sizeof(pkCtx.key_data).uint)
@@ -142,4 +177,5 @@ proc bearVerifyECPem*(data, key: string, sig: openarray[byte], alg: ptr HashClas
 
   let impl = ecGetDefault()
   let s = ecdsaVrfyRawGetDefault()
-  result = s(impl, addr digest[0], hashLen.uint, addr pk, unsafeAddr sig[0], sig.len.uint) == 1
+  result =
+    s(impl, addr digest[0], hashLen.uint, addr pk, unsafeAddr sig[0], sig.len.uint) == 1

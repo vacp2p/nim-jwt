@@ -1,13 +1,10 @@
 import json, strutils
-
-from base64 import nil
-
+import base64
 
 proc checkJsonNodeKind*(node: JsonNode, kind: JsonNodeKind) =
   # Check that a given JsonNode has a given kind, raise ValueError if not
   if node.kind != kind:
     raise newException(ValueError, "Invalid kind")
-
 
 proc checkKeysExists*(node: JsonNode, keys: varargs[string]) =
   for key in keys:
@@ -18,7 +15,7 @@ proc encodeUrlSafe*(s: openarray[byte]): string =
   when (NimMajor >= 1 and (NimMinor >= 1 or NimPatch >= 2)) or NimMajor >= 2:
     result = base64.encode(s)
   else:
-    result = base64.encode(s, newLine="")
+    result = base64.encode(s, newLine = "")
   while result.endsWith("="):
     result.setLen(result.len - 1)
   result = result.replace('+', '-').replace('/', '_')

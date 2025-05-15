@@ -1,6 +1,5 @@
 import json, times, unittest
-
-import ../jwt
+import jwt
 
 proc getToken(claims: JsonNode = newJObject(), header: JsonNode = newJObject()): JWT =
   for k, v in %*{"alg": "HS512", "typ": "JWT"}:
