@@ -47,11 +47,7 @@ proc pemDecoderLoop(
 
 proc decodeFromPem(skCtx: var SkeyDecoderContext, pem: string) =
   skeyDecoderInit(skCtx)
-  pemDecoderLoop(
-    pem,
-    cast[proc(ctx: pointer, pbytes: pointer, nbytes: uint) {.bearSslFunc.}](skeyDecoderPush),
-    addr skCtx,
-  )
+  pemDecoderLoop(pem, skeyDecoderPushShim, addr skCtx)
   if skeyDecoderLastError(skCtx) != 0:
     invalidPemKey()
 
